@@ -1,33 +1,35 @@
 import cv2
 import os
 import numpy as np
+import time
 from model import unet
 from segnet import segnet
 from model_wIndices import unet_wIndices
-from keras.preprocessing.image import img_to_array
+from keras.preprocessing.image import img_to_array, array_to_img
 from keras.utils import multi_gpu_model, plot_model, print_summary
 from keras.callbacks import EarlyStopping, TensorBoard, ModelCheckpoint
 import keras.backend as K
+from keras.models import load_model
 
 
 class Trainer(object):
     def __init__(self, _train_list, _val_list, _inf_list, _dag_it = 0, _input_shape = (256, 1024, 3),
                  _train_steps = 500, _val_steps = 200, _num_epochs = 15, _batch_size = 4, _gpu_num = '0, 1',
-                 _no_inidices = True, _segnet = False):
+                 _no_inidices = True, _segnet = False, _load_weights = False, _weights_dir = ''):
         self.dag_it = _dag_it
         self.train_list = _train_list
         self.val_list = _val_list
         self.inf_list = _inf_list
-        self.base_dir = '/media/localadmin/Test/11Nils/kitti/dataset/sequences/Data/'
-        self.img_dir = 'images/'
+        self.base_dir = '/home/nils/nils/results/'
+        self.img_dir = 'image_2/'
         self.label_dir = 'labels/'
         self.inf_dir = 'inf/'
         self.dag_dir = 'dagger/'
-        self.log_dir = 'log/'
+        self.log_dir = 'log_test/'
         self.optimizer = 'adagrad'
         self.gpu_num = _gpu_num  # '1'
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_num
+        os.environ["CUDA_VISIBLE_DEVICES"] = '0'#self.gpu_num
         self.untrained = 'store_true'
         self.loss = 'categorical_crossentropy'
         self.output_mode = 'softmax'
@@ -40,17 +42,8 @@ class Trainer(object):
         self.n_epochs = _num_epochs
         self.batch_size = _batch_size
         self.filters = 8
-        self.b_pool_indices = _no_inidices
-        self.b_use_segnet = _segnet
-        if not self.b_pool_indices and not self.b_use_segnet:
-            self.model = unet_wIndices(self.input_shape, self.n_labels, self.filters, self.kernel, self.pool_size,
-                                       self.output_mode)
-        elif not self.b_use_segnet:
-            self.model = unet(self.input_shape, self.n_labels, self.filters, self.kernel, self.pool_size,
-                              self.output_mode)
-        else:
-            self.model = segnet(self.input_shape, self.n_labels, self.filters, self.kernel, self.pool_size,
-                                self.output_mode)
+
+        self.model = load_model(_weights_dir)
         print(self.model.summary())
         list_gpus_trained = [int(x) for x in self.gpu_num.split(',')]
         self.num_gpus = len(list_gpus_trained)
@@ -59,10 +52,11 @@ class Trainer(object):
             print('Training on GPU\'s: ' + trained_gpu_str)
             self.multi_model = multi_gpu_model(self.model, gpus = self.num_gpus)
         else:
+            print('Training on single GPU!')
             self.multi_model = self.model
         self.multi_model.compile(loss = self.loss, optimizer = self.optimizer, metrics = ['accuracy'])
-        plot_model(model = self.multi_model, to_file = self.base_dir + 'model.png')
-        print(print_summary(self.multi_model))
+        # plot_model(model = self.multi_model, to_file = self.base_dir + 'model.png')
+        # print(print_summary(self.multi_model))
         self.std = [0.32636853, 0.31895106, 0.30716496]
         self.mean = [0.39061851, 0.38151629, 0.3547171]
         self.es_cb = []
@@ -98,21 +92,18 @@ class Trainer(object):
         resized_img = cv2.resize(cropped_img, (dims[1], dims[0]))
         normed = resized_img / 255.0
         mean_free = (normed[:, :] - self.mean) / self.std
-        array_img = img_to_array(mean_free)
-        return array_img
+        return img_to_array(mean_free)
 
     def crop(self, img, dims):
         h, w, c = img.shape
         cropped_img = img[(h - 256):h, ((w - 1024) // 2): (w - (w - 1024) // 2)]
-        resized_img = cv2.resize(cropped_img, (dims[1], dims[0]))
-        return resized_img / 255.0
+        return cv2.resize(cropped_img, (dims[1], dims[0])) / 255
 
     def crop_resive_mask(self, mask, dims):
         h, w, c = mask.shape
         cropped_mask = mask[(h - 256):h, ((w - 1024) // 2): (w - (w - 1024) // 2)]
         resized_mask = cv2.resize(cropped_mask, (dims[1], dims[0]))
-        array_mask = img_to_array(resized_mask) / 255
-        return array_mask
+        return img_to_array(resized_mask) / 255
 
     def train(self):
 
@@ -128,17 +119,43 @@ class Trainer(object):
     def predict(self):
         path = self.base_dir + self.inf_dir
         for i, name in enumerate(self.inf_list):
+            start = time.time()
             imgs = []
             img = cv2.imread(self.base_dir + self.img_dir + name)
-
-            imgs.append(self.crop_resize_norm_bgr(img, self.input_shape))
+            # imgs.append(self.crop_resize_norm_bgr(img, self.input_shape))
+            imgs.append(self.crop(img, self.input_shape))
             imgs = np.array(imgs)
 
             inference = self.multi_model.predict(imgs)
             out = cv2.resize(inference[0], (1024, 256))
 
-            print('\r\033[1A\033[0KInference done on %d of %d Images' % (i, len(self.inf_list)))
-            cv2.imwrite(path + name, out * 255)
+            input = self.crop(img, (256, 1024))
+            cv2.imshow('test', cv2.addWeighted(input, 0.5, np.asarray(out, np.float64), 0.5, 0.0))
+            cv2.waitKey(10)
+            elapsed = time.time() - start
+            print('\r\033[1A\033[0KInference done on %d of %d Images at %.2f Hz' % (i, len(self.inf_list), 1 / elapsed))
+            # cv2.imwrite(path + name, out * 255)
+
+    def predict_own(self):
+        path = self.base_dir + self.inf_dir
+        for i, name in enumerate(self.inf_list):
+            start = time.time()
+            imgs = []
+            img = cv2.imread(path + name)
+            if img is None:
+                pass
+            # imgs.append(self.crop_resize_norm_bgr(img, self.input_shape))
+            imgs.append(img_to_array(cv2.resize(img / 255., (1024, 256))))
+            imgs = np.array(imgs)
+
+            inference = self.multi_model.predict(imgs)
+            out = cv2.resize(inference[0], (1024, 256))
+            input = cv2.resize(imgs[0], (1024, 256))
+            cv2.imshow('overlaid', cv2.addWeighted(np.asarray(input, np.float64), 0.5,
+                                                   np.asarray(out, np.float64), 0.5, 0.0))
+            cv2.waitKey(10)
+            elapsed = time.time() - start
+            print('\r\033[1A\033[0KInference done on %d of %d Images at %.2f Hz' % (i, len(self.inf_list), 1 / elapsed))
 
     def finish(self):
         K.clear_session()

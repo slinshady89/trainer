@@ -8,37 +8,25 @@ from random import shuffle
 
 
 def main():
-    base_dir = '/media/localadmin/Test/11Nils/kitti/dataset/sequences/Data/'
-    label_dir = 'labels/'
-    train_img_dir = 'images/'
-    eval_base_dir = '/media/localadmin/Test/11Nils/kitti/dataset/sequences/08/'
-    eval_lbl_dir = 'labels/'
+    eval_base_dir = '/home/nils/nils/results/'
     eval_img_dir = 'image_2/'
     inf_dir = 'pooling_test/'
-    test_no_indices = True
-    if test_no_indices:
-        inf_dir_tested = 'MaxPooling2D/'
-        log = 'log/'
-        gpu_num = '0, 1, 2, 3'
-    else:
-        inf_dir_tested = 'MaxPooling2DWithIndices/'
-        log = 'log_indices/'
-        gpu_num = '2, 3'
-    segnet = True
+    # /absolute/directory/to/weightsXX.hdf5
+    weights_dir = ''
+    load_weights = True
+
+    test_no_indices = True  # True if model without indice forwarding should be loaded
+    segnet = False  # True if SegNet model should be loaded
     if segnet:
         inf_dir_tested = 'SegNet/'
-        log = 'log_seg/'
         gpu_num = '2, 3'
+    else:
+        inf_dir_tested = 'test/'
+        gpu_num = '2'
 
-    label_list = sorted(os.listdir(base_dir + label_dir))
-
-    shuffle(label_list)
-
-    train = label_list[:int(len(label_list)*0.8)]
-    val = label_list[int(len(label_list)*0.8):]
-    eval = os.listdir(eval_base_dir + eval_lbl_dir)
-
-    print(len(train), len(val), len(eval))
+    # list that contains all images for the inference
+    eval = sorted(os.listdir(eval_base_dir + eval_img_dir))
+    print('\n%d images for inference available.\n' % eval)
 
     with tf.Graph().as_default():
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -46,41 +34,23 @@ def main():
         session = tf.Session('')
         KTF.set_session(session)
         KTF.set_learning_phase(1)
-        trainer = Trainer(_train_list = train,
-                          _val_list = val,
-                          _inf_list = eval,
+        trainer = Trainer(_inf_list = eval,
                           _gpu_num = gpu_num,
                           _no_inidices = test_no_indices,
-                          _segnet = segnet)
-        trainer.base_dir = base_dir
-        trainer.label_dir = label_dir
-        trainer.img_dir = train_img_dir
-        trainer.log_dir = eval_base_dir + inf_dir + log
+                          _segnet = segnet,
+                          _load_weights = load_weights,
+                          _weights_dir = weights_dir)
+
+        # directory images are loaded trainer.base_dir + trainer.inf_dir
+        trainer.base_dir = eval_base_dir
         trainer.inf_dir = inf_dir + inf_dir_tested
-        trainer.batch_size = 16
-        trainer.epoch_steps = 750
-        trainer.val_steps = 200
-        trainer.n_epochs = 30
-        trainer.dag_it = 0
-        trainer.update_callback()
-        # trains model for defined number of epochs with the actual dataset
-        print('Loading labels from %s' % (trainer.base_dir + trainer.label_dir))
-        print('Loading imgs from %s' % (trainer.base_dir + trainer.img_dir))
-        trainer.train()
-        print('\nTraining done!\nStarting Prediction\n')
-        # safes inferences of images that are unseen by the net
 
         trainer.base_dir = eval_base_dir
         trainer.img_dir = eval_img_dir
-        print('Loading labels from %s' % (trainer.base_dir + trainer.label_dir))
         print('Loading imgs from %s' % (trainer.base_dir + trainer.img_dir))
 
-        trainer.predict()
-        session.close()
-
-
-
-
+        # trainer.predict()
+        trainer.predict_own()
 
 
 if __name__ == "__main__":
