@@ -7,7 +7,7 @@ from trainer import Inferencer
 def main():
 
     # /absolute/directory/to/images/for/inference/
-    inf_dir = '/media/Test/00_Nils/kitti/data/sequences/08/image_2/'
+    inf_dir = ''
     # /absolute/directory/to/weightsXX.hdf5
     weights_dir = ''
     load_weights = True
@@ -19,7 +19,9 @@ def main():
 
     # list that contains all images for the inference
     inf_imgs = sorted(os.listdir(inf_dir))
-    print('\n%d images for inference available.\n' % inf_imgs)
+    for img in inf_imgs:
+        print(inf_dir + "/" + img)
+    print('\n%d images for inference available.\n' % len(inf_imgs))
 
     with tf.Graph().as_default():
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"

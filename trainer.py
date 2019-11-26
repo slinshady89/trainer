@@ -26,7 +26,10 @@ class Inferencer(object):
                                           )
 
         print(self.multi_model.summary())
-        self.multi_model.compile()
+        # it is mandatory to pass an optimizer and the loss to compile even loaded architectures and weights!
+        self.multi_model.compile(optimizer = 'adagrad',
+                                 loss = 'categorical_crossentropy',
+                                 metrics = ['accuracy'])
         # plot_model(model = self.multi_model, to_file = self.base_dir + 'model.png')
         # print(print_summary(self.multi_model))
         self.std = [0.32636853, 0.31895106, 0.30716496]
@@ -86,8 +89,10 @@ class Inferencer(object):
             inference = self.multi_model.predict(imgs)
             out = cv2.resize(inference[0], (1024, 256))
             input = cv2.resize(imgs[0], (1024, 256))
-            cv2.imshow('overlaid', cv2.addWeighted(np.asarray(input, np.float64), 0.5,
-                                                   np.asarray(out, np.float64), 0.5, 0.0))
+            overlaid = cv2.addWeighted(np.asarray(input, np.float64), 0.5,
+                                                   np.asarray(out, np.float64), 0.5, 0.0)
+            cv2.imshow('overlaid', overlaid)
+            # cv2.imwrite(path + '/inf/' + name, overlaid * 255)
             cv2.waitKey(10)
             elapsed = time.time() - start
             print('\r\033[1A\033[0KInference done on %d of %d Images at %.2f Hz' % (i, len(self.inf_list), 1 / elapsed))
