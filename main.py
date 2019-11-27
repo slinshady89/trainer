@@ -7,9 +7,10 @@ from trainer import Inferencer
 def main():
 
     # /absolute/directory/to/images/for/inference/
-    inf_dir = ''
-    # /absolute/directory/to/weightsXX.hdf5
-    weights_dir = ''
+    # inf_dir = '/media/Test/00_Nils/kitti/data/sequences/08/image_2/'
+    inf_dir = '/media/localadmin/Test/11Nils/kitti/dataset/sequences/05/image_2/'
+   # /absolute/directory/to/weightsXX.hdf5
+    weights_dir = '/media/localadmin/Test/11Nils/kitti/dataset/sequences/Data/dagger_final/09/log/weights25.hdf5'
     load_weights = True
 
     test_no_indices = True  # True if model without indice forwarding should be loaded
@@ -19,8 +20,6 @@ def main():
 
     # list that contains all images for the inference
     inf_imgs = sorted(os.listdir(inf_dir))
-    for img in inf_imgs:
-        print(inf_dir + "/" + img)
     print('\n%d images for inference available.\n' % len(inf_imgs))
 
     with tf.Graph().as_default():
@@ -40,7 +39,8 @@ def main():
         print('Loading imgs from %s' % trainer.inf_dir)
 
         # trainer.predict()
-        trainer.predict_own()
+        # trainer.predict_own()
+        trainer.predict_Kitti()
 
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@ class Inferencer(object):
         self.multi_model.compile(optimizer = 'adagrad',
                                  loss = 'categorical_crossentropy',
                                  metrics = ['accuracy'])
+        # self.multi_model.compile()
         # plot_model(model = self.multi_model, to_file = self.base_dir + 'model.png')
         # print(print_summary(self.multi_model))
         self.std = [0.32636853, 0.31895106, 0.30716496]
@@ -60,7 +61,8 @@ class Inferencer(object):
             start = time.time()
             imgs = []
             img = cv2.imread(path + name)
-            imgs.append(self.crop_resize_norm_bgr(img, (1024, 256)))
+            #imgs.append(self.crop_resize_norm_bgr(img, (1024, 256)))
+            imgs.append(self.crop_resize_norm_bgr(img, (256, 1024)))
             # imgs.append(self.crop(img, self.input_shape))
             imgs = np.array(imgs)
 
@@ -83,7 +85,8 @@ class Inferencer(object):
             if img is None:
                 pass
             # imgs.append(self.crop_resize_norm_bgr(img, self.input_shape))
-            imgs.append(img_to_array(cv2.resize(img / 255., (1024, 256))))
+            imgs.append(self.crop_resize_norm_bgr(img, (256, 1024)))
+            # imgs.append(img_to_array(cv2.resize(img / 255., (1024, 256))))
             imgs = np.array(imgs)
 
             inference = self.multi_model.predict(imgs)
